@@ -6,6 +6,15 @@ library.
 
 [oslo_config]: https://docs.openstack.org/oslo.config/
 
+## Running the tests
+
+This module includes a test suite.  To run the tests:
+
+    ansible-playbook -i tests/inventory tests/main.yml
+
+A successful test run will include a nonzero "failed" count due to the
+way Ansible handles `rescue` stanzas in blocks.
+
 ## License
 
 ansible-os-config -- oslo_config configuration reader  
