@@ -1,0 +1,112 @@
+- hosts: all
+  gather_facts: false
+  roles:
+    - ../../ansible-os-config
+
+- name: "test-001 -- test simple key=value"
+  hosts: all
+  gather_facts: false
+  tags:
+    - test-001
+  tasks:
+    - os_config:
+        path: "{{ inventory_dir }}/test-001/test.conf"
+        options:
+          - name: simple
+      register: test_conf
+
+    - debug:
+        var: test_conf
+
+    - assert:
+        that:
+          - test_conf.config.simple == 'a simple string'
+
+- name: "test-002 -- test multi-string"
+  hosts: all
+  gather_facts: false
+  tags:
+    - test-002
+  tasks:
+    - os_config:
+        path: "{{ inventory_dir }}/test-002/test.conf"
+        options:
+          - name: multi
+            type: multistr
+      register: test_conf
+
+    - debug:
+        var: test_conf
+
+    - assert:
+        that:
+          - test_conf.config.multi|length == 3
+          - test_conf.config.multi == ['one', 'two', 'three']
+
+- name: "test-003 -- check validation behavior"
+  hosts: all
+  gather_facts: false
+  tags:
+    - test-003
+  tasks:
+    - set_fact:
+        block_failed: false
+
+    - block:
+        - os_config:
+            path: "{{ inventory_dir }}/test-003/test.conf"
+            options:
+              - name: address
+                type: ip
+          register: test_conf
+      rescue:
+        - set_fact:
+            block_failed: true
+
+    - assert:
+        that:
+          - block_failed
+
+- name: "test-004 -- deprecated names"
+  hosts: all
+  gather_facts: false
+  tags:
+    - test-004
+  tasks:
+    - os_config:
+        path: "{{ inventory_dir }}/test-004/test.conf"
+        options:
+          - group: application
+            name: newname
+            deprecated_group: DEFAULT
+            deprecated_name: oldname
+      register: test_conf
+
+    - debug:
+        var: test_conf
+
+    - assert:
+        that:
+          - test_conf.config.application.newname == 'value'
+
+- name: "test-005 -- multiple files"
+  hosts: all
+  gather_facts: false
+  tags:
+    - test-005
+  tasks:
+    - os_config:
+        path:
+          - "{{ inventory_dir }}/test-005/test.conf"
+          - "{{ inventory_dir }}/test-005/test-override.conf"
+        options:
+          - name: simple
+      register: test_conf
+
+    - debug:
+        var: test_conf
+
+    - assert:
+        that:
+          - test_conf.config.simple == 'this is a test'
+

@@ -1,0 +1,102 @@
+#!/usr/bin/python
+# WANT_JSON
+
+from ansible.module_utils.basic import AnsibleModule
+import sys
+import json
+
+try:
+    import oslo_config
+    import oslo_config.cfg
+except ImportError:
+    oslo_config = None
+
+def build_options(options):
+    cfg = oslo_config.cfg.ConfigOpts()
+    for option in options:
+        _name = option['name']
+        _group = option.get('group')
+        _type = option.get('type', 'string')
+
+        for k in ['name', 'type', 'group']:
+            if k in option:
+                del option[k]
+
+        if _type in ['str', 'string']:
+            _opt = oslo_config.cfg.StrOpt(_name, **option)
+        elif _type in ['bool', 'boolean']:
+            _opt = oslo_config.cfg.BoolOpt(_name, **option)
+        elif _type in ['int', 'integer']:
+            _opt = oslo_config.cfg.IntOpt(_name, **option)
+        elif _type in ['float']:
+            _opt = oslo_config.cfg.FloatOpt(_name, **option)
+        elif _type in ['list']:
+            _opt = oslo_config.cfg.ListOpt(_name, **option)
+        elif _type in ['dict']:
+            _opt = oslo_config.cfg.DictOpt(_name, **option)
+        elif _type in ['multi']:
+            _opt = oslo_config.cfg.MultiOpt(_name, **option)
+        elif _type in ['multistr', 'multistring']:
+            _opt = oslo_config.cfg.MultiStrOpt(_name, **option)
+        elif _type in ['ip']:
+            _opt = oslo_config.cfg.IPOpt(_name, **option)
+        elif _type in ['port']:
+            _opt = oslo_config.cfg.PortOpt(_name, **option)
+        elif _type in ['host', 'hostname']:
+            _opt = oslo_config.cfg.HostnameOpt(_name, **option)
+        elif _type in ['uri']:
+            _opt = oslo_config.cfg.UriOpt(_name, **option)
+        else:
+            raise ValueError('unknown option type: %s' % _type)
+
+        cfg.register_opt(_opt, group=_group)
+
+    return cfg
+
+def conf_to_dict(conf):
+    _conf = {}
+    for k, v in conf.items():
+        if isinstance(v, conf.GroupAttr):
+            v = dict(v)
+
+        _conf[k] = v
+
+    return _conf
+
+def main():
+    module = AnsibleModule(
+        argument_spec=dict(
+            path=dict(type='list'),
+            options=dict(type='list', required=True),
+            project=dict(),
+        ),
+        supports_check_mode=True,
+    )
+
+    _path = module.params.get('path')
+    _project = module.params.get('project')
+    _options = module.params.get('options')
+
+    if oslo_config is None:
+        module.fail_json(msg='oslo_config module is not available')
+    if _path is None and _project is None:
+        module.fail_json(msg='you must provide either path or project')
+
+    try:
+        CONF = build_options(_options)
+    except ValueError as exc:
+        module.fail_json(msg=str(exc))
+
+    try:
+        CONF(args=[],
+             project=_project,
+             default_config_files=_path)
+        conf_dict = conf_to_dict(CONF)
+    except oslo_config.cfg.Error as exc:
+        module.fail_json(msg=str(exc))
+
+    module.exit_json(changed=False,
+                     config=conf_dict)
+
+if __name__ == '__main__':
+    main()
